@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -737,6 +738,23 @@ func TestWorktreePrepareResumeMoveRepairRemove(t *testing.T) {
 	}
 }
 
+// pruned is the paths a `worktree prune` reported as dropped. The report is JSON, so a path is compared
+// decoded: the raw text escapes every backslash of a Windows path.
+func pruned(t *testing.T, out string) []string {
+	t.Helper()
+	var report struct {
+		Removed []workspace.Association `json:"removed"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("prune did not report JSON: %v: %s", err, out)
+	}
+	paths := []string{}
+	for _, assoc := range report.Removed {
+		paths = append(paths, assoc.Path)
+	}
+	return paths
+}
+
 func TestWorktreePruneDropsOnlyTheAssociationsOfGoneWorktrees(t *testing.T) {
 	f := setup(t)
 	api := f.repository("api")
@@ -748,8 +766,8 @@ func TestWorktreePruneDropsOnlyTheAssociationsOfGoneWorktrees(t *testing.T) {
 	webTree := tree(t, f.ok("worktree", "prepare", "--repo", "web", "--plan", p.ID))
 
 	// With every worktree listed there is nothing to drop, and the check agrees.
-	if out := f.ok("worktree", "prune", "--repo", "api"); strings.Contains(out, gone.Path) {
-		t.Fatalf("pruned a worktree Git still lists: %s", out)
+	if dropped := pruned(t, f.ok("worktree", "prune", "--repo", "api")); len(dropped) != 0 {
+		t.Fatalf("pruned a worktree Git still lists: %v", dropped)
 	}
 	f.ok("check")
 
@@ -762,12 +780,11 @@ func TestWorktreePruneDropsOnlyTheAssociationsOfGoneWorktrees(t *testing.T) {
 	}
 
 	// Another repository's stale association is not this repository's to drop.
-	if out := f.ok("worktree", "prune", "--repo", "web"); strings.Contains(out, gone.Path) {
-		t.Fatalf("pruned another repository's association: %s", out)
+	if dropped := pruned(t, f.ok("worktree", "prune", "--repo", "web")); len(dropped) != 0 {
+		t.Fatalf("pruned another repository's association: %v", dropped)
 	}
-	out := f.ok("worktree", "prune", "--repo", "api")
-	if !strings.Contains(out, gone.Path) || strings.Contains(out, other.Path) {
-		t.Fatalf("pruned the wrong associations: %s", out)
+	if dropped := pruned(t, f.ok("worktree", "prune", "--repo", "api")); !slices.Equal(dropped, []string{gone.Path}) {
+		t.Fatalf("pruned the wrong associations: %v, want only %s", dropped, gone.Path)
 	}
 	f.ok("check")
 
@@ -779,8 +796,8 @@ func TestWorktreePruneDropsOnlyTheAssociationsOfGoneWorktrees(t *testing.T) {
 	if _, err := os.Stat(webTree.Path); err != nil {
 		t.Fatal("pruned another repository's worktree")
 	}
-	if again := f.ok("worktree", "prune", "--repo", "api"); strings.Contains(again, gone.Path) {
-		t.Fatalf("pruned twice: %s", again)
+	if again := pruned(t, f.ok("worktree", "prune", "--repo", "api")); len(again) != 0 {
+		t.Fatalf("pruned twice: %v", again)
 	}
 	f.fail("worktree", "prune", "--repo", "missing")
 }
