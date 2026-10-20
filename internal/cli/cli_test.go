@@ -737,6 +737,54 @@ func TestWorktreePrepareResumeMoveRepairRemove(t *testing.T) {
 	}
 }
 
+func TestWorktreePruneDropsOnlyTheAssociationsOfGoneWorktrees(t *testing.T) {
+	f := setup(t)
+	api := f.repository("api")
+	f.repository("web")
+	i := f.intent("billing")
+	p := f.plan(i.ID, "billing", "api", "web")
+	gone := tree(t, f.ok("worktree", "prepare", "--repo", "api", "--plan", p.ID))
+	other := tree(t, f.ok("worktree", "prepare", "--repo", "api", "--plan", p.ID, "--branch", "cc/other/api", "--path", filepath.Join(f.home, "other"), "--reuse"))
+	webTree := tree(t, f.ok("worktree", "prepare", "--repo", "web", "--plan", p.ID))
+
+	// With every worktree listed there is nothing to drop, and the check agrees.
+	if out := f.ok("worktree", "prune", "--repo", "api"); strings.Contains(out, gone.Path) {
+		t.Fatalf("pruned a worktree Git still lists: %s", out)
+	}
+	f.ok("check")
+
+	// A worktree removed with Git itself leaves its association behind. The check names the
+	// command that discharges it rather than a repair that cannot work.
+	git(t, api, "worktree", "remove", "--force", gone.Path)
+	report := f.fail("check")
+	if !strings.Contains(report, "worktree prune --repo api") {
+		t.Fatalf("check does not point at prune: %s", report)
+	}
+
+	// Another repository's stale association is not this repository's to drop.
+	if out := f.ok("worktree", "prune", "--repo", "web"); strings.Contains(out, gone.Path) {
+		t.Fatalf("pruned another repository's association: %s", out)
+	}
+	out := f.ok("worktree", "prune", "--repo", "api")
+	if !strings.Contains(out, gone.Path) || strings.Contains(out, other.Path) {
+		t.Fatalf("pruned the wrong associations: %s", out)
+	}
+	f.ok("check")
+
+	// Nothing but the association went: the branch and the other worktrees are as they were.
+	git(t, api, "show-ref", "--verify", "refs/heads/"+gone.Branch)
+	if _, err := os.Stat(other.Path); err != nil {
+		t.Fatal("pruned a worktree that Git still lists")
+	}
+	if _, err := os.Stat(webTree.Path); err != nil {
+		t.Fatal("pruned another repository's worktree")
+	}
+	if again := f.ok("worktree", "prune", "--repo", "api"); strings.Contains(again, gone.Path) {
+		t.Fatalf("pruned twice: %s", again)
+	}
+	f.fail("worktree", "prune", "--repo", "missing")
+}
+
 func TestWorktreeExistingBranchAndIgnoredFiles(t *testing.T) {
 	f := setup(t)
 	api := f.repository("api")
