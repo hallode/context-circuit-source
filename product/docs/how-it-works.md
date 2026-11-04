@@ -147,11 +147,11 @@ agent.
 **The prompt.** Answers to the numbered questions, and consent to the outcome as
 written — not to the original request.
 
-**What the agent does.** It records the approval in the person's own words,
-recommends creating plans as the next step, and stops. No code is read and no
+**What the agent does.** It records the approval as a decision in the record's
+language, recommends creating plans as the next step, and stops. No code is read and no
 plan ID is reserved yet.
 
-**What the CLI does.** `record approve` stamps `approved_at` and keeps the words
+**What the CLI does.** `record approve` stamps `approved_at` and keeps the decision
 beside it. It returns `planning_recommended`, because recording a decision is
 not finishing the request, and the next step is the person's to ask for.
 
