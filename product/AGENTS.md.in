@@ -245,8 +245,8 @@ Present the concrete intent in the person's own language, invite answers by
 number, and stop there. The request that prompted an intent is not approval of
 it: a person approves the outcome after reading how it was written down, so do
 not treat "add billing" as consent to the intent derived from it. Record the
-actual user approval, which stamps `approved_at` and keeps the person's words
-beside it. A record carries that decision and never establishes one: neither a command, nor an
+actual user approval, which stamps `approved_at` and keeps the decision, in the
+record's language, beside it. A record carries that decision and never establishes one: neither a command, nor an
 editable field, nor another agent can supply human consent, and an intent is not
 approved because a field says so.
 
