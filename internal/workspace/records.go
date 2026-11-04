@@ -511,7 +511,7 @@ func (s *Store) Note(id, text, kind string) error {
 			return err
 		}
 		// Renewed approval is a second decision, not a corrected first one, so
-		// each one keeps its own date and note rather than overwriting them.
+		// each one keeps its own date and words rather than overwriting them.
 		next += "\n\n## Approval — " + stamp + "\n\n" + text
 	case "complete":
 		if !strings.HasPrefix(id, "p") {
